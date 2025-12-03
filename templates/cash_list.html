@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>Caja</h4>
+    <a class="btn btn-primary" href="{{ url_for('cash_new_form') }}">Nuevo movimiento</a>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted">Entradas</div><h4>AR$ {{ '%.2f' % entradas }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted">Salidas</div><h4>AR$ {{ '%.2f' % salidas }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted">Saldo</div><h4>AR$ {{ '%.2f' % saldo }}</h4></div></div></div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Monto</th><th>Orden</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.fecha.strftime("%d/%m/%Y %H:%M") }}</td>
+          <td><span class="badge {% if r.tipo=='entrada' %}text-bg-success{% else %}text-bg-danger{% endif %}">{{ r.tipo|capitalize }}</span></td>
+          <td>{{ r.concepto }}</td>
+          <td>AR$ {{ '%.2f' % r.monto }}</td>
+          <td>{% if r.order %}<a href="{{ url_for('order_detail', order_id=r.order.id) }}">#{{ r.order.id }}</a>{% else %}—{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted text-center">Sin movimientos</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

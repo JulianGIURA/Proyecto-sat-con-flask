@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h4>{{ 'Editar cliente' if client else 'Nuevo cliente' }}</h4>
+
+  <form id="clientForm" method="post" novalidate>
+    <div class="row g-3">
+
+      <div class="col-md-6">
+        <label class="form-label">Nombre <span class="text-danger">*</span></label>
+        <input class="form-control" id="nombre" name="nombre" value="{{ client.nombre if client else '' }}" required>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Teléfono <span class="text-danger">*</span></label>
+        <input class="form-control" id="telefono" name="telefono" value="{{ client.telefono if client else '' }}" required inputmode="numeric" pattern="\d+" title="Solo números">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">DNI <span class="text-danger">*</span></label>
+        <input class="form-control" id="dni" name="dni" value="{{ client.dni if client else '' }}" required inputmode="numeric" pattern="\d+" title="Solo números">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Email <span class="text-danger">*</span></label>
+        <input class="form-control" id="email" name="email" value="{{ client.email if client else '' }}" required type="email" pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$" title="Debe ser un email válido">
+      </div>
+
+      <div class="col-md-8">
+        <label class="form-label">Dirección</label>
+        <input class="form-control" name="direccion" value="{{ client.direccion if client else '' }}">
+      </div>
+
+    </div>
+
+    <div class="mt-3">
+      <button id="btnGuardar" class="btn btn-primary" disabled>Guardar</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('clients_list') }}">Cancelar</a>
+    </div>
+  </form>
+</div>
+
+<style>
+.is-valid {
+  border: 2px solid #28a745 !important;
+}
+.is-invalid {
+  border: 2px solid #dc3545 !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('clientForm');
+  const nombre = document.getElementById('nombre');
+  const telefono = document.getElementById('telefono');
+  const dni = document.getElementById('dni');
+  const email = document.getElementById('email');
+  const btnGuardar = document.getElementById('btnGuardar');
+
+  function limpiarSoloNumeros(e) {
+    const limpio = e.target.value.replace(/\D/g, '');
+    if (e.target.value !== limpio) e.target.value = limpio;
+  }
+
+  function marcarInput(input, ok) {
+    input.classList.remove("is-valid", "is-invalid");
+    if (ok) input.classList.add("is-valid");
+    else input.classList.add("is-invalid");
+  }
+
+  function validar() {
+    const nombreOk = (nombre.value || '').trim().length > 0;
+    const telOk = /^\d+$/.test((telefono.value || '').trim());
+    const dniOk = /^\d+$/.test((dni.value || '').trim());
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test((email.value || '').trim());
+
+    marcarInput(nombre, nombreOk);
+    marcarInput(telefono, telOk);
+    marcarInput(dni, dniOk);
+    marcarInput(email, emailOk);
+
+    const todoOk = nombreOk && telOk && dniOk && emailOk;
+    btnGuardar.disabled = !todoOk;
+    return todoOk;
+  }
+
+  nombre.addEventListener('input', validar);
+  telefono.addEventListener('input', e => { limpiarSoloNumeros(e); validar(); });
+  dni.addEventListener('input', e => { limpiarSoloNumeros(e); validar(); });
+  email.addEventListener('input', validar);
+
+  validar();
+
+  form.addEventListener('submit', function (e) {
+    if (!validar()) e.preventDefault();
+  });
+});
+</script>
+{% endblock %}

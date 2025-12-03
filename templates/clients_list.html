@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>Clientes</h4>
+    <a class="btn btn-primary" href="{{ url_for('client_new_form') }}">Nuevo</a>
+  </div>
+  <form class="row g-2 mb-3">
+    <div class="col-md-6"><input class="form-control" type="search" name="q" placeholder="Buscar por nombre, teléfono, email..." value="{{ q }}"></div>
+    <div class="col-md-2"><button class="btn btn-outline-secondary w-100" type="submit">Buscar</button></div>
+  </form>
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Dirección</th><th></th></tr></thead>
+      <tbody>
+        {% for c in clients %}
+        <tr>
+          <td>{{ c.id }}</td>
+          <td>{{ c.nombre }}</td>
+          <td>{{ c.telefono }}</td>
+          <td>{{ c.email }}</td>
+          <td>{{ c.direccion }}</td>
+          <td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('client_edit_form', client_id=c.id) }}">Editar</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted">Sin clientes</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

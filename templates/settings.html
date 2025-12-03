@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width:860px;">
+  <h4>Configuración</h4>
+
+  <form id="settingsForm" method="post" enctype="multipart/form-data" novalidate>
+    <div class="row g-3">
+
+      <!-- Empresa -->
+      <div class="col-md-6">
+        <label class="form-label">Nombre de la empresa <span class="text-danger">*</span></label>
+        <input
+          class="form-control"
+          id="empresa"
+          name="empresa"
+          value="{{ s.empresa }}"
+          required
+        >
+      </div>
+
+      <!-- Teléfono -->
+      <div class="col-md-3">
+        <label class="form-label">Teléfono <span class="text-danger">*</span></label>
+        <input
+          class="form-control"
+          id="telefono"
+          name="telefono"
+          value="{{ s.telefono }}"
+          required
+          inputmode="numeric"
+          pattern="\\d+"
+          title="Solo números"
+        >
+      </div>
+
+      <!-- Email -->
+      <div class="col-md-3">
+        <label class="form-label">Email <span class="text-danger">*</span></label>
+        <input
+          class="form-control"
+          id="email"
+          name="email"
+          value="{{ s.email }}"
+          required
+          type="email"
+          pattern="^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+          title="Debe ser un email válido"
+        >
+      </div>
+
+      <!-- Dirección -->
+      <div class="col-md-12">
+        <label class="form-label">Dirección</label>
+        <input class="form-control" name="direccion" value="{{ s.direccion }}">
+      </div>
+
+      <!-- Garantías y condiciones -->
+      <div class="col-md-12">
+        <label class="form-label">Garantías / Condiciones (aparecen en ticket y PDF)</label>
+        <textarea
+          class="form-control"
+          name="condiciones"
+          rows="4"
+          placeholder="Ejemplo:
+- Garantía de 90 días sobre la reparación.
+- No cubre golpes, humedad ni daños por mal uso.
+- Es obligatorio presentar el ticket para hacer valer la garantía."
+        >{{ s.condiciones }}</textarea>
+      </div>
+
+      <!-- Logo -->
+      <div class="col-md-6">
+        <label class="form-label">Logo (PNG/JPG, máx 4MB)</label>
+        <input
+          class="form-control"
+          type="file"
+          name="logo"
+          accept=".png,.jpg,.jpeg"
+        >
+      </div>
+
+      <div class="col-md-6 d-flex align-items-end">
+        {% if s.logo_filename %}
+          <img src="{{ url_for('static', filename='uploads/' + s.logo_filename) }}" alt="logo" style="height:64px">
+        {% else %}
+          <span class="text-muted">Sin logo cargado</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <button id="btnGuardar" class="btn btn-primary" disabled>Guardar</button>
+    </div>
+  </form>
+</div>
+
+<style>
+.is-valid { border: 2px solid #28a745 !important; }
+.is-invalid { border: 2px solid #dc3545 !important; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('settingsForm');
+  const empresa = document.getElementById('empresa');
+  const telefono = document.getElementById('telefono');
+  const email = document.getElementById('email');
+  const btnGuardar = document.getElementById('btnGuardar');
+
+  function limpiarSoloNumeros(e) {
+    const limpio = e.target.value.replace(/\\D/g, '');
+    if (e.target.value !== limpio) {
+      e.target.value = limpio;
+    }
+  }
+
+  function marcar(input, ok) {
+    input.classList.remove("is-valid", "is-invalid");
+    input.classList.add(ok ? "is-valid" : "is-invalid");
+  }
+
+  function validar() {
+    const empresaOk = empresa.value.trim().length > 0;
+    const telOk = /^\\d+$/.test(telefono.value.trim());
+    const emailOk = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.value.trim());
+
+    marcar(empresa, empresaOk);
+    marcar(telefono, telOk);
+    marcar(email, emailOk);
+
+    const todoOk = empresaOk && telOk && emailOk;
+    btnGuardar.disabled = !todoOk;
+
+    return todoOk;
+  }
+
+  telefono.addEventListener('input', e => { limpiarSoloNumeros(e); validar(); });
+  empresa.addEventListener('input', validar);
+  email.addEventListener('input', validar);
+
+  validar();
+
+  form.addEventListener('submit', function (e) {
+    if (!validar()) e.preventDefault();
+  });
+});
+</script>
+
+{% endblock %}

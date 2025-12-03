@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="row g-3">
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6 class="text-muted">Órdenes totales</h6><h2>{{ total_orders }}</h2></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6 class="text-muted">Abiertas</h6><h2>{{ open_orders }}</h2></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6 class="text-muted">Listas</h6><h2>{{ ready_orders }}</h2></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6 class="text-muted">Entregadas</h6><h2>{{ delivered_orders }}</h2></div></div></div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-md-6">
+      <div class="card text-center">
+        <div class="card-body">
+          <h6 class="text-muted">Saldo de caja</h6>
+          <h3>AR$ {{ '%.2f' % saldo }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <h5>Últimas órdenes</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+        {% for o in recent %}
+          <tr>
+            <td>{{ o.id }}</td>
+            <td>{{ o.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+            <td>{{ o.client.nombre }}</td>
+            <td>{{ o.marca }} {{ o.modelo }}</td>
+            <td><span class="badge text-bg-primary">{{ o.estado_label() }}</span></td>
+            <td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('order_detail', order_id=o.id) }}">Ver</a></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="text-center text-muted">Sin registros</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

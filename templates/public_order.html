@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width: 840px;">
+
+  <!-- Encabezado con logo + datos -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      {% if settings and settings.logo_filename %}
+        <img
+          src="{{ url_for('static', filename='uploads/' ~ settings.logo_filename) }}"
+          alt="Logo"
+          style="max-height: 60px;"
+        >
+      {% endif %}
+    </div>
+    <div class="text-end small">
+      <div class="fw-bold">{{ settings.empresa or 'Servicio Técnico' }}</div>
+      {% if settings and settings.direccion %}<div>{{ settings.direccion }}</div>{% endif %}
+      {% if settings and settings.telefono %}<div>{{ settings.telefono }}</div>{% endif %}
+      {% if settings and settings.email %}<div>{{ settings.email }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="text-center mb-3">
+    <h4>Seguimiento de Orden</h4>
+    <div class="text-muted">Este es un enlace público de solo lectura.</div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">
+      Orden #{{ order.id }} · Estado
+      <span class="badge text-bg-primary">{{ order.estado_label() }}</span>
+    </div>
+    <div class="card-body row g-3">
+
+      <div class="col-md-6">
+        <h6>Cliente</h6>
+        <div><strong>{{ order.client.nombre }}</strong></div>
+        <div class="text-muted">
+          {{ order.client.telefono or 'Sin teléfono' }}
+          ·
+          {{ order.client.email or 'Sin email' }}
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <h6>Equipo</h6>
+        <div><strong>{{ order.marca }} {{ order.modelo }}</strong></div>
+        <div>IMEI: {{ order.imei or '—' }}</div>
+      </div>
+
+      <div class="col-md-12">
+        <h6>Diagnóstico</h6>
+        <div>{{ order.diagnostico or '—' }}</div>
+      </div>
+
+      <div class="col-md-12">
+        <h6>Historial</h6>
+        <ul class="list-group list-group-flush">
+          {% for h in order.historial %}
+          <li class="list-group-item d-flex justify-content-between">
+            <span>
+              <strong>
+                {{ {
+                  'recibido':'Recibido',
+                  'diagnostico':'Diagnóstico',
+                  'en_proceso':'En proceso',
+                  'esperando_repuestos':'Esperando repuestos',
+                  'listo':'Listo para entregar',
+                  'entregado':'Entregado',
+                  'cancelado':'Cancelado'
+                }[h.estado] if h.estado in [
+                  'recibido','diagnostico','en_proceso','esperando_repuestos','listo','entregado','cancelado'
+                ] else h.estado }}
+              </strong>
+              — {{ h.nota or '' }}
+            </span>
+            <span class="text-muted small">
+              {{ h.created_at.strftime("%d/%m/%Y %H:%M") }}
+            </span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">Sin historial</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    Podés guardar o compartir este enlace. Al cambiar el estado, verás la actualización al recargar.
+  </div>
+
+  {% if settings and settings.condiciones %}
+  <div class="mt-3 p-2 border rounded small bg-light">
+    <strong>Garantía y condiciones del servicio</strong>
+    <div class="mt-1">
+      {{ settings.condiciones | replace('\n', '<br>') | safe }}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
