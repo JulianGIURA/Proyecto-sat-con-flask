@@ -1,5 +1,6 @@
 Flask==3.0.0
 Flask-SQLAlchemy==3.1.1
-reportlab==4.2.2
+SQLAlchemy==2.0.44
 qrcode==7.4.2
-Pillow==10.4.0
+reportlab==4.2.2
+gunicorn==23.0.0
