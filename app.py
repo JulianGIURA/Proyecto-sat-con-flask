@@ -150,6 +150,26 @@ def ensure_db():
     if not os.path.exists(DB_PATH):
         db.create_all()
 
+@app.context_processor
+def inject_app_settings():
+    # Traemos el primer registro de Settings
+    settings = Settings.query.first()
+
+    # Si no existe nada en la tabla, usamos valores por defecto en memoria
+    if not settings:
+        settings = Settings(
+            empresa="SAT Celulares",
+            direccion="",
+            telefono="",
+            email="",
+            logo_filename=None,
+            condiciones=""
+        )
+
+    # Esto hace que 'app_settings' esté disponible en TODOS los templates
+    return {"app_settings": settings}
+
+
 @app.get("/")
 def index():
     total_orders = RepairOrder.query.count()
