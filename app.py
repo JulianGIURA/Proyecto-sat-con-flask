@@ -142,8 +142,16 @@ def seed():
 
 @app.context_processor
 def inject_settings():
-    
-    return {"settings": get_settings()}
+    # Obtenemos la configuración principal
+    settings = get_settings()
+
+    # La exponemos con las dos claves:
+    # - 'settings'  (por si algún template viejo la usa)
+    # - 'app_settings' (para base.html y otros nuevos)
+    return {
+        "settings": settings,
+        "app_settings": settings,
+    }
 
 @app.before_request
 def ensure_db():
