@@ -29,11 +29,30 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-secret")
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+
+# ========================================
+#   BASE DE DATOS: POSTGRES EN RENDER
+#   y SQLITE en local (fallback)
+# ========================================
+
+database_url = os.getenv("DATABASE_URL")  # Render
+
+if database_url:
+    # Fix necesario porque SQLAlchemy requiere 'postgresql://'
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+else:
+    # Local → SQLite
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+
+# No cambiar
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
 
 db = SQLAlchemy(app)
+
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login_form"  # Vista donde se redirige al intentar entrar sin login
