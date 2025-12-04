@@ -206,10 +206,12 @@ def inject_settings():
         "app_settings": settings,
     }
 
-@app.before_request
-def ensure_db():
-    if not os.path.exists(DB_PATH):
-        db.create_all()
+@app.before_first_request
+def init_db():
+    db.create_all()
+    create_default_admin()
+    get_settings()
+
 
 
 
