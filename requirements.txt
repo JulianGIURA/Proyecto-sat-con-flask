@@ -4,3 +4,5 @@ SQLAlchemy==2.0.44
 qrcode==7.4.2
 reportlab==4.2.2
 gunicorn==23.0.0
+flask-login
+
