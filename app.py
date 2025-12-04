@@ -206,12 +206,28 @@ def inject_settings():
         "app_settings": settings,
     }
 
-@app.before_first_request
-def init_db():
-    db.create_all()
-    create_default_admin()
-    get_settings()
 
+# --- INICIO DEL CAMBIO ---
+
+# 1. Definimos la función para crear el admin (porque no existía en tu archivo)
+def create_default_admin():
+    # Verifica si ya existe el admin para no duplicarlo
+    if not User.query.filter_by(username="admin").first():
+        # Crea un usuario admin con contraseña "admin"
+        # ¡Cámbiala luego entrando al sistema!
+        admin = User(username="admin", role="admin")
+        admin.set_password("admin") 
+        db.session.add(admin)
+        db.session.commit()
+        print(">>> Usuario Admin creado por defecto (User: admin / Pass: admin)")
+
+# 2. Ejecutamos la inicialización inmediatamente (Reemplaza a before_first_request)
+with app.app_context():
+    db.create_all()      # Crea las tablas si no existen
+    create_default_admin() # Crea el usuario admin
+    get_settings()       # Asegura que la config existe
+
+# --- FIN DEL CAMBIO ---
 
 
 
