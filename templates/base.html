@@ -10,22 +10,39 @@
 <body>
 <nav class="navbar navbar-expand-lg bg-dark navbar-dark">
   <div class="container-fluid">
-    <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+    <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') if current_user.is_authenticated else '#' }}">
       {% if app_settings.logo_filename %}
         <img class="brand-logo me-2" src="{{ url_for('static', filename='uploads/' + app_settings.logo_filename) }}" alt="logo">
       {% endif %}
       <span>{{ app_settings.empresa or 'SAT' }}</span>
     </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
     <div class="collapse navbar-collapse" id="nav">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('orders_list') }}">Órdenes</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('clients_list') }}">Clientes</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('cash_list') }}">Caja</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('order_new_form') }}">Nueva Orden</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('client_new_form') }}">Nuevo Cliente</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('settings_view') }}">Configuración</a></li>
-      </ul>
+      {% if current_user.is_authenticated %}
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('orders_list') }}">Órdenes</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('clients_list') }}">Clientes</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('cash_list') }}">Caja</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('order_new_form') }}">Nueva Orden</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('client_new_form') }}">Nuevo Cliente</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('settings_view') }}">Configuración</a></li>
+        </ul>
+        <div class="d-flex align-items-center">
+          <span class="navbar-text me-2 small">
+            {{ current_user.username }}
+          </span>
+          <a class="btn btn-sm btn-outline-light" href="{{ url_for('logout') }}">Salir</a>
+        </div>
+      {% else %}
+        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('login_form') }}">Iniciar sesión</a>
+          </li>
+        </ul>
+      {% endif %}
     </div>
   </div>
 </nav>

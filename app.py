@@ -7,6 +7,16 @@ from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 
+
+from flask_login import (
+    LoginManager,
+    login_user,
+    logout_user,
+    login_required,
+    current_user,
+    UserMixin,
+)
+from werkzeug.security import generate_password_hash, check_password_hash
 from reportlab.lib.pagesizes import A5, landscape
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
@@ -24,6 +34,10 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
 
 db = SQLAlchemy(app)
+
+login_manager = LoginManager(app)
+login_manager.login_view = "login_form"  # Vista donde se redirige al intentar entrar sin login
+
 
 ORDER_STATES = [
     ("recibido", "Recibido"),
@@ -108,6 +122,26 @@ class CashEntry(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey("repair_order.id"))
     order = db.relationship("RepairOrder", backref=db.backref("movimientos_caja", lazy=True))
 
+# ============================
+#   USUARIOS PARA LOGIN
+# ============================
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(20), default="tecnico")  # admin / tecnico / cajero
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 def parse_float(val: Optional[str]) -> Optional[float]:
     if val is None or val.strip() == "":
         return None
@@ -158,27 +192,10 @@ def ensure_db():
     if not os.path.exists(DB_PATH):
         db.create_all()
 
-@app.context_processor
-def inject_app_settings():
-    # Traemos el primer registro de Settings
-    settings = Settings.query.first()
-
-    # Si no existe nada en la tabla, usamos valores por defecto en memoria
-    if not settings:
-        settings = Settings(
-            empresa="SAT Celulares",
-            direccion="",
-            telefono="",
-            email="",
-            logo_filename=None,
-            condiciones=""
-        )
-
-    # Esto hace que 'app_settings' esté disponible en TODOS los templates
-    return {"app_settings": settings}
 
 
 @app.get("/")
+@login_required
 def index():
     total_orders = RepairOrder.query.count()
     open_orders = RepairOrder.query.filter(RepairOrder.estado.in_(["recibido","diagnostico","en_proceso","esperando_repuestos"])).count()
@@ -193,10 +210,12 @@ def index():
 
 # Settings
 @app.get("/settings")
+@login_required
 def settings_view():
     return render_template("settings.html", s=get_settings())
 
 @app.post("/settings")
+@login_required
 def settings_save():
     s = get_settings()
     s.empresa = request.form.get("empresa","").strip()
@@ -217,9 +236,44 @@ def settings_save():
     flash("Configuración guardada", "success")
     return redirect(url_for("settings_view"))
 
+# ============================
+# LOGIN / LOGOUT
+# ============================
+
+@app.get("/login")
+def login_form():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    return render_template("login.html")
+
+@app.post("/login")
+def login():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+
+    user = User.query.filter_by(username=username).first()
+    if not user or not user.check_password(password):
+        flash("Usuario o contraseña inválidos.", "danger")
+        return redirect(url_for("login_form"))
+
+    login_user(user)
+    flash("Sesión iniciada.", "success")
+    next_url = request.args.get("next") or url_for("index")
+    return redirect(next_url)
+
+@app.get("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("Sesión cerrada.", "success")
+    return redirect(url_for("login_form"))
+
+
 # Clients
 from sqlalchemy import or_
 @app.get("/clients")
+@login_required
+
 def clients_list():
     q = request.args.get("q", "").strip()
     query = Client.query
@@ -230,10 +284,14 @@ def clients_list():
     return render_template("clients_list.html", clients=clients, q=q)
 
 @app.get("/clients/new")
+@login_required
+
 def client_new_form():
     return render_template("client_form.html", client=None)
 
 @app.post("/clients/new")
+@login_required
+
 def client_create():
     nombre = request.form.get("nombre", "").strip()
     telefono = request.form.get("telefono", "").strip()
@@ -262,11 +320,15 @@ def client_create():
     return redirect(url_for("clients_list"))
 
 @app.get("/clients/<int:client_id>/edit")
+@login_required
+
 def client_edit_form(client_id: int):
     client = Client.query.get_or_404(client_id)
     return render_template("client_form.html", client=client)
 
 @app.post("/clients/<int:client_id>/edit")
+@login_required
+
 def client_update(client_id: int):
     client = Client.query.get_or_404(client_id)
 
@@ -296,6 +358,8 @@ def client_update(client_id: int):
 
 # Orders
 @app.get("/orders")
+@login_required
+
 def orders_list():
     q = request.args.get("q","").strip()
     estado = request.args.get("estado","").strip()
@@ -311,11 +375,15 @@ def orders_list():
     return render_template("orders_list.html", orders=orders, q=q, estado=estado, estados=ORDER_STATES)
 
 @app.get("/orders/new")
+@login_required
+
 def order_new_form():
     clients = Client.query.order_by(Client.nombre.asc()).all()
     return render_template("order_form.html", order=None, clients=clients, estados=ORDER_STATES)
 
 @app.post("/orders/new")
+@login_required
+
 def order_create():
     client_id = request.form.get("client_id")
     client = Client.query.get(client_id)
@@ -351,6 +419,8 @@ def order_create():
     return redirect(url_for("orders_list"))
 
 @app.get("/orders/<int:order_id>")
+@login_required
+
 def order_detail(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
     public_url = url_for("order_public", token=order.token_publico, _external=True)
@@ -360,12 +430,16 @@ def order_detail(order_id: int):
     return render_template("order_detail.html", order=order, estados=ORDER_STATES, public_url=public_url, wa_link=wa_link, total_repuestos=total_repuestos)
 
 @app.get("/orders/<int:order_id>/edit")
+@login_required
+
 def order_edit_form(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
     clients = Client.query.order_by(Client.nombre.asc()).all()
     return render_template("order_form.html", order=order, clients=clients, estados=ORDER_STATES)
 
 @app.post("/orders/<int:order_id>/edit")
+@login_required
+
 def order_update(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
     client_id = request.form.get("client_id")
@@ -388,6 +462,8 @@ def order_update(order_id: int):
     return redirect(url_for("order_detail", order_id=order.id))
 
 @app.post("/orders/<int:order_id>/status")
+@login_required
+
 def order_change_status(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
     nuevo_estado = request.form.get("estado")
@@ -457,6 +533,8 @@ def order_change_status(order_id: int):
 
 # Parts internal
 @app.post("/orders/<int:order_id>/parts/add")
+@login_required
+
 def add_part(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
     desc = request.form.get("descripcion","").strip()
@@ -469,6 +547,8 @@ def add_part(order_id: int):
     return redirect(url_for("order_detail", order_id=order.id))
 
 @app.post("/orders/<int:order_id>/parts/<int:part_id>/del")
+@login_required
+
 def del_part(order_id: int, part_id: int):
     part = Part.query.get_or_404(part_id)
     db.session.delete(part); db.session.commit()
@@ -477,6 +557,8 @@ def del_part(order_id: int, part_id: int):
 
 # Cash
 @app.get("/cash")
+@login_required
+
 def cash_list():
     entradas = db.session.query(db.func.coalesce(db.func.sum(CashEntry.monto),0.0)).filter(CashEntry.tipo=="entrada").scalar() or 0.0
     salidas = db.session.query(db.func.coalesce(db.func.sum(CashEntry.monto),0.0)).filter(CashEntry.tipo=="salida").scalar() or 0.0
@@ -485,11 +567,15 @@ def cash_list():
     return render_template("cash_list.html", rows=rows, entradas=entradas, salidas=salidas, saldo=saldo)
 
 @app.get("/cash/new")
+@login_required
+
 def cash_new_form():
     orders = RepairOrder.query.order_by(RepairOrder.created_at.desc()).limit(50).all()
     return render_template("cash_form.html", orders=orders)
 
 @app.post("/cash/new")
+@login_required
+
 def cash_create():
     tipo = request.form.get("tipo")
     concepto = request.form.get("concepto","").strip()
@@ -511,6 +597,8 @@ def _qr_bytes_for_url(url: str) -> bytes:
     return buf.getvalue()
 
 @app.get("/orders/<int:order_id>/pdf")
+@login_required
+
 def order_pdf(order_id: int):
     o = RepairOrder.query.get_or_404(order_id)
     s = get_settings()
@@ -670,6 +758,8 @@ def order_public(token: str):
     return render_template("public_order.html", order=o)
 
 @app.get("/orders/<int:order_id>/ticket")
+@login_required
+
 def order_ticket(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
     return render_template("ticket.html", order=order)
