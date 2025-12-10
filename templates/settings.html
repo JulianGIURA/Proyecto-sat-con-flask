@@ -16,21 +16,21 @@
           value="{{ s.empresa }}"
           required
         >
+        <div id="empresaError" class="form-text text-danger d-none"></div>
       </div>
 
       <!-- Teléfono -->
       <div class="col-md-3">
-        <label class="form-label">Teléfono <span class="text-danger">*</span></label>
+        <label class="form-label">Teléfono / WhatsApp <span class="text-danger">*</span></label>
         <input
           class="form-control"
           id="telefono"
           name="telefono"
           value="{{ s.telefono }}"
           required
-          inputmode="numeric"
-          pattern="\\d+"
-          title="Solo números"
+          inputmode="tel"
         >
+        <div id="telefonoError" class="form-text text-danger d-none"></div>
       </div>
 
       <!-- Email -->
@@ -43,9 +43,8 @@
           value="{{ s.email }}"
           required
           type="email"
-          pattern="^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
-          title="Debe ser un email válido"
         >
+        <div id="emailError" class="form-text text-danger d-none"></div>
       </div>
 
       <!-- Dirección -->
@@ -77,6 +76,9 @@
           name="logo"
           accept=".png,.jpg,.jpeg"
         >
+        <div class="form-text">
+          Formatos permitidos: PNG, JPG o JPEG. Tamaño máximo: 4MB.
+        </div>
       </div>
 
       <div class="col-md-6 d-flex align-items-end">
@@ -101,32 +103,70 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('settingsForm');
-  const empresa = document.getElementById('empresa');
-  const telefono = document.getElementById('telefono');
-  const email = document.getElementById('email');
+  const form       = document.getElementById('settingsForm');
+  const empresa    = document.getElementById('empresa');
+  const telefono   = document.getElementById('telefono');
+  const email      = document.getElementById('email');
   const btnGuardar = document.getElementById('btnGuardar');
 
-  function limpiarSoloNumeros(e) {
-    const limpio = e.target.value.replace(/\\D/g, '');
-    if (e.target.value !== limpio) {
-      e.target.value = limpio;
-    }
-  }
+  const empresaError  = document.getElementById('empresaError');
+  const telefonoError = document.getElementById('telefonoError');
+  const emailError    = document.getElementById('emailError');
 
   function marcar(input, ok) {
     input.classList.remove("is-valid", "is-invalid");
+    if (input.value.trim() === "") {
+      // Sin clases si está vacío (para que no se vea rojo desde el inicio)
+      return;
+    }
     input.classList.add(ok ? "is-valid" : "is-invalid");
   }
 
   function validar() {
-    const empresaOk = empresa.value.trim().length > 0;
-    const telOk = /^\\d+$/.test(telefono.value.trim());
-    const emailOk = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.value.trim());
+    const empresaVal = empresa.value.trim();
+    const telVal     = telefono.value.trim();
+    const emailVal   = email.value.trim();
 
+    // Empresa: obligatorio
+    const empresaOk = empresaVal.length > 0;
+
+    // Teléfono: permitimos espacios, +, guiones, paréntesis;
+    // condición real: al menos 6 dígitos en total
+    const soloDigitos = telVal.replace(/\D/g, '');
+    const telOk = soloDigitos.length >= 6;
+
+    // Email: patrón simple tipo texto@texto.texto
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
+
+    // Marcar visualmente
     marcar(empresa, empresaOk);
     marcar(telefono, telOk);
     marcar(email, emailOk);
+
+    // Mensajes de error
+    if (!empresaOk) {
+      empresaError.textContent = "Ingresá el nombre de la empresa.";
+      empresaError.classList.remove("d-none");
+    } else {
+      empresaError.textContent = "";
+      empresaError.classList.add("d-none");
+    }
+
+    if (!telOk) {
+      telefonoError.textContent = "Ingresá un teléfono válido (mínimo 6 dígitos). Ej: 2616744195 o +54 9 261 123 4567.";
+      telefonoError.classList.remove("d-none");
+    } else {
+      telefonoError.textContent = "";
+      telefonoError.classList.add("d-none");
+    }
+
+    if (!emailOk) {
+      emailError.textContent = "Ingresá un correo válido. Ej: celulares.st.mendoza@gmail.com";
+      emailError.classList.remove("d-none");
+    } else {
+      emailError.textContent = "";
+      emailError.classList.add("d-none");
+    }
 
     const todoOk = empresaOk && telOk && emailOk;
     btnGuardar.disabled = !todoOk;
@@ -134,14 +174,17 @@ document.addEventListener('DOMContentLoaded', function () {
     return todoOk;
   }
 
-  telefono.addEventListener('input', e => { limpiarSoloNumeros(e); validar(); });
   empresa.addEventListener('input', validar);
+  telefono.addEventListener('input', validar);
   email.addEventListener('input', validar);
 
+  // Validar una vez al cargar, por si ya hay datos
   validar();
 
   form.addEventListener('submit', function (e) {
-    if (!validar()) e.preventDefault();
+    if (!validar()) {
+      e.preventDefault();
+    }
   });
 });
 </script>
