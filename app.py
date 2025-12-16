@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os, io, secrets, urllib.parse
 from datetime import datetime
+from functools import wraps
 from typing import Optional
 from werkzeug.utils import secure_filename
 
@@ -66,6 +67,12 @@ ORDER_STATES = [
     ("listo", "Listo para entregar"),
     ("entregado", "Entregado"),
     ("cancelado", "Cancelado"),
+]
+
+ROLE_CHOICES = [
+    ("admin", "Administrador"),
+    ("tecnico", "Técnico"),
+    ("cajero", "Cajero"),
 ]
 
 def gen_token(n=10):
@@ -176,6 +183,26 @@ def get_settings() -> Settings:
         db.session.add(s); db.session.commit()
     return s
 
+
+def roles_required(*roles):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return login_manager.unauthorized()
+            if current_user.role not in roles:
+                flash("No tenés permisos para acceder a esta sección.", "danger")
+                return redirect(url_for("index"))
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def role_required(*roles):
+    return roles_required(*roles)
+
 @app.cli.command("seed")
 def seed():
     db.create_all()
@@ -248,11 +275,13 @@ def index():
 # Settings
 @app.get("/settings")
 @login_required
+@roles_required("admin")
 def settings_view():
     return render_template("settings.html", s=get_settings())
 
 @app.post("/settings")
 @login_required
+@roles_required("admin")
 def settings_save():
     s = get_settings()
     s.empresa = request.form.get("empresa","").strip()
@@ -306,10 +335,118 @@ def logout():
     return redirect(url_for("login_form"))
 
 
+@app.get("/users")
+@login_required
+@role_required("admin")
+def users_list():
+    users = User.query.order_by(User.username).all()
+    return render_template("users_list.html", users=users, role_choices=ROLE_CHOICES)
+
+
+@app.get("/users/new")
+@login_required
+@role_required("admin")
+def user_new_form():
+    return render_template("user_form.html", user=None, role_choices=ROLE_CHOICES)
+
+
+@app.post("/users/new")
+@login_required
+@role_required("admin")
+def user_create():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    role = request.form.get("role", "tecnico")
+
+    if not username or not password:
+        flash("Usuario y contraseña son obligatorios.", "danger")
+        return redirect(url_for("user_new_form"))
+
+    if role not in dict(ROLE_CHOICES):
+        flash("Rol inválido.", "danger")
+        return redirect(url_for("user_new_form"))
+
+    if User.query.filter_by(username=username).first():
+        flash("Ya existe un usuario con ese nombre.", "danger")
+        return redirect(url_for("user_new_form"))
+
+    u = User(username=username, role=role)
+    u.set_password(password)
+    db.session.add(u)
+    db.session.commit()
+
+    flash("Usuario creado.", "success")
+    return redirect(url_for("users_list"))
+
+
+@app.get("/users/<int:user_id>/edit")
+@login_required
+@role_required("admin")
+def user_edit_form(user_id: int):
+    user = User.query.get_or_404(user_id)
+    return render_template("user_form.html", user=user, role_choices=ROLE_CHOICES)
+
+
+@app.post("/users/<int:user_id>/edit")
+@login_required
+@role_required("admin")
+def user_update(user_id: int):
+    user = User.query.get_or_404(user_id)
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    role = request.form.get("role", "tecnico")
+
+    if not username:
+        flash("El nombre de usuario es obligatorio.", "danger")
+        return redirect(url_for("user_edit_form", user_id=user.id))
+
+    if role not in dict(ROLE_CHOICES):
+        flash("Rol inválido.", "danger")
+        return redirect(url_for("user_edit_form", user_id=user.id))
+
+    existing = User.query.filter_by(username=username).first()
+    if existing and existing.id != user.id:
+        flash("Ya existe un usuario con ese nombre.", "danger")
+        return redirect(url_for("user_edit_form", user_id=user.id))
+
+    user.username = username
+    user.role = role
+    if password:
+        user.set_password(password)
+
+    db.session.commit()
+    flash("Usuario actualizado.", "success")
+    return redirect(url_for("users_list"))
+
+
+@app.post("/users/<int:user_id>/delete")
+@login_required
+@role_required("admin")
+def user_delete(user_id: int):
+    user = User.query.get_or_404(user_id)
+
+    if user.id == current_user.id:
+        flash("No podés eliminar tu propio usuario.", "danger")
+        return redirect(url_for("users_list"))
+
+    if user.role == "admin":
+        admin_count = User.query.filter_by(role="admin").count()
+        if admin_count <= 1:
+            flash("No se puede eliminar el último administrador.", "danger")
+            return redirect(url_for("users_list"))
+
+    db.session.delete(user)
+    db.session.commit()
+    flash("Usuario eliminado.", "success")
+    return redirect(url_for("users_list"))
+
+
 # Clients
 from sqlalchemy import or_
 @app.get("/clients")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def clients_list():
     q = request.args.get("q", "").strip()
@@ -322,12 +459,14 @@ def clients_list():
 
 @app.get("/clients/new")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def client_new_form():
     return render_template("client_form.html", client=None)
 
 @app.post("/clients/new")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def client_create():
     nombre = request.form.get("nombre", "").strip()
@@ -358,6 +497,7 @@ def client_create():
 
 @app.get("/clients/<int:client_id>/edit")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def client_edit_form(client_id: int):
     client = Client.query.get_or_404(client_id)
@@ -365,6 +505,7 @@ def client_edit_form(client_id: int):
 
 @app.post("/clients/<int:client_id>/edit")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def client_update(client_id: int):
     client = Client.query.get_or_404(client_id)
@@ -396,6 +537,7 @@ def client_update(client_id: int):
 # Orders
 @app.get("/orders")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def orders_list():
     q = request.args.get("q","").strip()
@@ -413,6 +555,7 @@ def orders_list():
 
 @app.get("/orders/new")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_new_form():
     clients = Client.query.order_by(Client.nombre.asc()).all()
@@ -420,6 +563,7 @@ def order_new_form():
 
 @app.post("/orders/new")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_create():
     client_id = request.form.get("client_id")
@@ -457,6 +601,7 @@ def order_create():
 
 @app.get("/orders/<int:order_id>")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_detail(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
@@ -468,6 +613,7 @@ def order_detail(order_id: int):
 
 @app.get("/orders/<int:order_id>/edit")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_edit_form(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
@@ -476,6 +622,7 @@ def order_edit_form(order_id: int):
 
 @app.post("/orders/<int:order_id>/edit")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_update(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
@@ -500,6 +647,7 @@ def order_update(order_id: int):
 
 @app.post("/orders/<int:order_id>/status")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_change_status(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
@@ -571,6 +719,7 @@ def order_change_status(order_id: int):
 # Parts internal
 @app.post("/orders/<int:order_id>/parts/add")
 @login_required
+@roles_required("admin", "tecnico")
 
 def add_part(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
@@ -585,6 +734,7 @@ def add_part(order_id: int):
 
 @app.post("/orders/<int:order_id>/parts/<int:part_id>/del")
 @login_required
+@roles_required("admin", "tecnico")
 
 def del_part(order_id: int, part_id: int):
     part = Part.query.get_or_404(part_id)
@@ -595,6 +745,7 @@ def del_part(order_id: int, part_id: int):
 # Cash
 @app.get("/cash")
 @login_required
+@roles_required("admin", "cajero")
 
 def cash_list():
     entradas = db.session.query(db.func.coalesce(db.func.sum(CashEntry.monto),0.0)).filter(CashEntry.tipo=="entrada").scalar() or 0.0
@@ -605,6 +756,7 @@ def cash_list():
 
 @app.get("/cash/new")
 @login_required
+@roles_required("admin", "cajero")
 
 def cash_new_form():
     orders = RepairOrder.query.order_by(RepairOrder.created_at.desc()).limit(50).all()
@@ -612,6 +764,7 @@ def cash_new_form():
 
 @app.post("/cash/new")
 @login_required
+@roles_required("admin", "cajero")
 
 def cash_create():
     tipo = request.form.get("tipo")
@@ -635,6 +788,7 @@ def _qr_bytes_for_url(url: str) -> bytes:
 
 @app.get("/orders/<int:order_id>/pdf")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_pdf(order_id: int):
     o = RepairOrder.query.get_or_404(order_id)
@@ -796,6 +950,7 @@ def order_public(token: str):
 
 @app.get("/orders/<int:order_id>/ticket")
 @login_required
+@roles_required("admin", "tecnico", "cajero")
 
 def order_ticket(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 540px;">
+  <h1 class="h4 mb-3">{{ 'Editar usuario' if user else 'Nuevo usuario' }}</h1>
+  <form method="post" action="{{ url_for('user_update', user_id=user.id) if user else url_for('user_create') }}">
+    <div class="mb-3">
+      <label class="form-label" for="username">Usuario</label>
+      <input class="form-control" id="username" name="username" value="{{ user.username if user else '' }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="role">Rol</label>
+      <select class="form-select" id="role" name="role" required>
+        {% for value, label in role_choices %}
+          <option value="{{ value }}" {% if user and user.role == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="password">{{ 'Nueva contraseña (opcional)' if user else 'Contraseña' }}</label>
+      <input type="password" class="form-control" id="password" name="password" {% if not user %}required{% endif %}>
+      {% if user %}
+        <div class="form-text">Dejar en blanco para mantener la contraseña actual.</div>
+      {% endif %}
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center">
+      <a class="btn btn-outline-secondary" href="{{ url_for('users_list') }}">Volver</a>
+      <button class="btn btn-primary" type="submit">Guardar</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
