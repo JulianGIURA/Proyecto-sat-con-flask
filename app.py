@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os, io, secrets, urllib.parse
 from datetime import datetime
+from functools import wraps
 from typing import Optional
 from werkzeug.utils import secure_filename
 
@@ -66,6 +67,12 @@ ORDER_STATES = [
     ("listo", "Listo para entregar"),
     ("entregado", "Entregado"),
     ("cancelado", "Cancelado"),
+]
+
+ROLE_CHOICES = [
+    ("admin", "Administrador"),
+    ("tecnico", "Técnico"),
+    ("cajero", "Cajero"),
 ]
 
 def gen_token(n=10):
@@ -175,6 +182,20 @@ def get_settings() -> Settings:
         s = Settings(id=1)
         db.session.add(s); db.session.commit()
     return s
+
+
+def role_required(*roles):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if current_user.role not in roles:
+                flash("No tenés permisos para acceder a esta sección.", "danger")
+                return redirect(url_for("index"))
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 @app.cli.command("seed")
 def seed():
@@ -304,6 +325,113 @@ def logout():
     logout_user()
     flash("Sesión cerrada.", "success")
     return redirect(url_for("login_form"))
+
+
+@app.get("/users")
+@login_required
+@role_required("admin")
+def users_list():
+    users = User.query.order_by(User.username).all()
+    return render_template("users_list.html", users=users, role_choices=ROLE_CHOICES)
+
+
+@app.get("/users/new")
+@login_required
+@role_required("admin")
+def user_new_form():
+    return render_template("user_form.html", user=None, role_choices=ROLE_CHOICES)
+
+
+@app.post("/users/new")
+@login_required
+@role_required("admin")
+def user_create():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    role = request.form.get("role", "tecnico")
+
+    if not username or not password:
+        flash("Usuario y contraseña son obligatorios.", "danger")
+        return redirect(url_for("user_new_form"))
+
+    if role not in dict(ROLE_CHOICES):
+        flash("Rol inválido.", "danger")
+        return redirect(url_for("user_new_form"))
+
+    if User.query.filter_by(username=username).first():
+        flash("Ya existe un usuario con ese nombre.", "danger")
+        return redirect(url_for("user_new_form"))
+
+    u = User(username=username, role=role)
+    u.set_password(password)
+    db.session.add(u)
+    db.session.commit()
+
+    flash("Usuario creado.", "success")
+    return redirect(url_for("users_list"))
+
+
+@app.get("/users/<int:user_id>/edit")
+@login_required
+@role_required("admin")
+def user_edit_form(user_id: int):
+    user = User.query.get_or_404(user_id)
+    return render_template("user_form.html", user=user, role_choices=ROLE_CHOICES)
+
+
+@app.post("/users/<int:user_id>/edit")
+@login_required
+@role_required("admin")
+def user_update(user_id: int):
+    user = User.query.get_or_404(user_id)
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    role = request.form.get("role", "tecnico")
+
+    if not username:
+        flash("El nombre de usuario es obligatorio.", "danger")
+        return redirect(url_for("user_edit_form", user_id=user.id))
+
+    if role not in dict(ROLE_CHOICES):
+        flash("Rol inválido.", "danger")
+        return redirect(url_for("user_edit_form", user_id=user.id))
+
+    existing = User.query.filter_by(username=username).first()
+    if existing and existing.id != user.id:
+        flash("Ya existe un usuario con ese nombre.", "danger")
+        return redirect(url_for("user_edit_form", user_id=user.id))
+
+    user.username = username
+    user.role = role
+    if password:
+        user.set_password(password)
+
+    db.session.commit()
+    flash("Usuario actualizado.", "success")
+    return redirect(url_for("users_list"))
+
+
+@app.post("/users/<int:user_id>/delete")
+@login_required
+@role_required("admin")
+def user_delete(user_id: int):
+    user = User.query.get_or_404(user_id)
+
+    if user.id == current_user.id:
+        flash("No podés eliminar tu propio usuario.", "danger")
+        return redirect(url_for("users_list"))
+
+    if user.role == "admin":
+        admin_count = User.query.filter_by(role="admin").count()
+        if admin_count <= 1:
+            flash("No se puede eliminar el último administrador.", "danger")
+            return redirect(url_for("users_list"))
+
+    db.session.delete(user)
+    db.session.commit()
+    flash("Usuario eliminado.", "success")
+    return redirect(url_for("users_list"))
 
 
 # Clients
