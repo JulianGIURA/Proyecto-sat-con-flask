@@ -177,11 +177,15 @@ def parse_float(val: Optional[str]) -> Optional[float]:
         return None
 
 def get_settings() -> Settings:
-    s = Settings.query.get(1)
-    if not s:
-        s = Settings(id=1)
-        db.session.add(s); db.session.commit()
-    return s
+    try:
+        s = Settings.query.get(1)
+        if not s:
+            s = Settings(id=1)
+            db.session.add(s)
+            db.session.commit()
+        return s
+    except Exception:
+        return Settings(id=1)
 
 
 def roles_required(*roles):
@@ -206,6 +210,7 @@ def role_required(*roles):
 @app.cli.command("seed")
 def seed():
     db.create_all()
+    create_default_admin()
     s = get_settings()
     if not Client.query.first():
         c1 = Client(nombre="Juan Pérez", telefono="261-555-1234", email="juan@example.com", direccion="San Martín 123")
@@ -247,12 +252,6 @@ def create_default_admin():
         db.session.add(admin)
         db.session.commit()
         print(">>> Usuario Admin creado por defecto (User: admin / Pass: admin)")
-
-# 2. Ejecutamos la inicialización inmediatamente (Reemplaza a before_first_request)
-with app.app_context():
-    db.create_all()      # Crea las tablas si no existen
-    create_default_admin() # Crea el usuario admin
-    get_settings()       # Asegura que la config existe
 
 # --- FIN DEL CAMBIO ---
 
@@ -955,4 +954,3 @@ def order_public(token: str):
 def order_ticket(order_id: int):
     order = RepairOrder.query.get_or_404(order_id)
     return render_template("ticket.html", order=order)
-
